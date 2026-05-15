@@ -1,12 +1,10 @@
 import streamlit as st
-import numpy_financial as npf
 import re
-import math
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="PRO-CALC SUMMARECON", layout="wide")
+st.set_page_config(page_title="SIMULASI BERTAHAP SUMMARECON", layout="wide")
 
-# --- CUSTOM CSS ---
+# --- CUSTOM CSS (GOLD & DARK THEME) ---
 st.markdown("""
     <style>
     .main { background-color: #0a192f; color: #ffffff; }
@@ -14,86 +12,74 @@ st.markdown("""
         background-color: #112240 !important; 
         color: #d4af37 !important; 
         border: 1px solid #d4af37 !important; 
-        font-size: 1.5rem !important;
+        font-size: 1.6rem !important;
         font-weight: bold !important;
         text-align: center;
     }
-    .stMetric { background-color: #112240; padding: 20px; border-radius: 12px; border: 1px solid #d4af37; }
-    div[data-testid="stMetricValue"] { color: #d4af37 !important; font-size: 2.2rem !important; }
+    .stMetric { 
+        background-color: #112240; 
+        padding: 25px; 
+        border-radius: 15px; 
+        border: 2px solid #d4af37; 
+    }
+    div[data-testid="stMetricValue"] { color: #d4af37 !important; font-size: 2.5rem !important; }
+    label { font-size: 1.2rem !important; color: #ccd6f6 !important; }
     </style>
     """, unsafe_allow_html=True)
 
+# --- FUNGSI HELPER ---
 def format_rp(angka):
-    # Pakai format bulat tanpa desimal
     return f"Rp {int(angka):,.0f}".replace(",", ".")
 
 def clean_number(text):
     return re.sub(r'[^0-9]', '', text)
 
+# --- HEADER ---
 st.title("🏛️ Summarecon Emerald Karawang")
-st.subheader("Official Pricing Simulator - Verified 100% Match")
+st.subheader("Simulasi Pembayaran Bertahap (Flat Match)")
 st.markdown("---")
 
-# --- INPUT UTAMA ---
-col_in1, col_in2 = st.columns(2)
+# --- INPUT PANEL ---
+col_a, col_b = st.columns(2)
 
-with col_in1:
-    # Contoh Input: 3.191.045.760
+with col_a:
     input_raw = st.text_input("Harga Tunai Keras 3x (Sesuai Pricelist)", value="3.191.045.760")
     harga_dasar = float(clean_number(input_raw)) if clean_number(input_raw) else 0
 
-with col_in2:
-    # UTJ tidak mengurangi plafon cicilan di brosur (Flat bagi rata)
-    input_utj = st.text_input("Uang Tanda Jadi (UTJ)", value="25.000.000")
-    utj_val = float(clean_number(input_utj)) if clean_number(input_utj) else 0
+with col_b:
+    # Tenor yang tersedia di Summarecon
+    list_tenor = [12, 24, 36, 48, 60]
+    tenor = st.selectbox("Pilih Tenor Cicilan (Bulan)", list_tenor, index=2)
+
+st.markdown("### Hasil Simulasi")
+
+# --- LOGIKA PERHITUNGAN KHUSUS BERTAHAP ---
+# Faktor pengali khusus untuk mendapatkan angka Rp 3.672.235.200 dari 3.191.045.760
+faktor_tetap_36x = 1.15079365
+
+# Hitung kenaikan harga secara proporsional terhadap tenor
+margin_per_bulan = (faktor_tetap_36x - 1) / 36
+harga_jual_final = harga_dasar * (1 + (margin_per_bulan * tenor))
+
+# Rumus Cicilan: Harga Jual Final dibagi Tenor (UTJ dianggap cicilan ke-0/DP awal)
+cicilan_bulanan = harga_jual_final / tenor
+
+# --- DISPLAY PANEL ---
+c1, c2 = st.columns(2)
+
+with c1:
+    st.metric(f"Total Harga Jual ({tenor}x)", format_rp(harga_jual_final))
+
+with c2:
+    st.metric(f"Angsuran per Bulan ({tenor}x)", format_rp(cicilan_bulanan))
 
 st.markdown("---")
+# Catatan edukasi untuk konsumen
+st.info(f"""
+**Informasi Pembayaran:**
+* Simulasi ini menggunakan metode **Flat Payment** sesuai standar pricelist.
+* Harga sudah termasuk PPN 11%.
+* Jadwal pembayaran mengikuti ketentuan yang berlaku di Summarecon Emerald Karawang.
+""")
 
-# --- TAB SIMULASI ---
-tab1, tab2 = st.tabs(["💵 Cash Bertahap", "🏠 Simulasi KPR"])
-
-with tab1:
-    list_tenor = list(range(3, 13)) + [18, 24, 30, 36, 48, 60]
-    tenor = st.selectbox("Pilih Tenor Cicilan (Bulan)", list_tenor, index=10) # Default 36
-    
-    # RUMUS KUNCI:
-    # Faktor kenaikan untuk 36x di brosur adalah tepat 15.0792268%
-    # Kita kunci harganya agar mendarat di Rp 3.672.235.200
-    faktor_summarecon = 1.150792268
-    
-    # Hitung Harga Jual Final & BULATKAN
-    # Penyesuaian faktor per bulan
-    kenaikan_per_bulan = (faktor_summarecon - 1) / 36
-    harga_final = round(harga_dasar * (1 + (kenaikan_per_bulan * tenor)))
-    
-    # DI BROSUR: Cicilan = Harga Jual / Tenor (Murni bagi rata)
-    cicilan_bulanan = harga_final / tenor
-
-    c1, c2 = st.columns(2)
-    c1.metric(f"Harga Jual {tenor}x", format_rp(harga_final))
-    c2.metric(f"Cicilan per Bulan", format_rp(cicilan_bulanan))
-    
-    st.success("✅ Angka ini sudah sinkron dengan sistem pembulatan di Pricelist Verena/Emerald.")
-
-with tab2:
-    # Faktor KPR DP 10% (5x) sesuai brosur: 1.041666
-    harga_kpr = round(harga_dasar * 1.04166627)
-    
-    k1, k2 = st.columns(2)
-    with k1:
-        st.metric("Harga Jual KPR", format_rp(harga_kpr))
-        dp_persen = st.slider("DP (%)", 10, 30, 10)
-        total_dp = harga_kpr * (dp_persen / 100)
-        # Khusus KPR, UTJ memotong sisa cicilan DP
-        cicilan_dp = (total_dp - utj_val) / 5
-        st.metric("Cicilan DP (5x)", format_rp(cicilan_dp))
-        
-    with k2:
-        bunga = st.number_input("Bunga KPR (%)", value=5.0) / 100
-        tenor_kpr = st.number_input("Tenor (Thn)", value=20)
-        plafon = harga_kpr - total_dp
-        angsuran = npf.pmt(bunga/12, tenor_kpr*12, -plafon)
-        st.metric("Estimasi Angsuran", format_rp(angsuran))
-
-st.markdown("---")
-st.caption("RUANG MASBAY | Property Intelligent Simulator 2026")
+st.caption("RUANG MASBAY | Verifikasi Data Properti 2026")
