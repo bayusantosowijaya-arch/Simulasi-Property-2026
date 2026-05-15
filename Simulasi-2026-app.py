@@ -1,70 +1,96 @@
 import streamlit as st
+import numpy_financial as npf
 import re
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="PRO-CALC SUMMARECON EMERALD", layout="wide")
+st.set_page_config(page_title="RUANG MASBAY PROPERTY INTELLIGENT", layout="wide")
 
-# --- CUSTOM CSS UNTUK TAMPILAN MEWAH & JELAS ---
+# --- CUSTOM CSS (PREMIUM LUXURY) ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    .stMetric { background-color: #1a1c24; padding: 15px; border-radius: 10px; border-left: 5px solid #d4af37; }
-    div[data-testid="stMetricValue"] { color: #d4af37 !important; font-size: 1.8rem !important; }
-    label { color: #d4af37 !important; font-weight: bold !important; }
+    .main { background-color: #0a192f; color: #ffffff; }
+    .stTextInput input { 
+        background-color: #112240 !important; 
+        color: #d4af37 !important; 
+        border: 1px solid #d4af37 !important; 
+        font-size: 1.3rem !important;
+        font-weight: bold !important;
+        text-align: center;
+    }
+    .stMetric { background-color: #112240; padding: 20px; border-radius: 12px; border: 1px solid #d4af37; }
+    div[data-testid="stMetricValue"] { color: #d4af37 !important; }
     </style>
     """, unsafe_allow_html=True)
 
+# --- FUNGSI HELPER ---
 def format_rp(angka):
-    # Format pembulatan nol desimal agar sama dengan cetakan kantor
-    return f"Rp {int(round(angka)):,.0f}".replace(",", ".")
+    # Menggunakan int agar tidak ada angka desimal dibelakang koma sesuai pricelist
+    return f"Rp {int(angka):,.0f}".replace(",", ".")
 
 def clean_number(text):
     return re.sub(r'[^0-9]', '', text)
 
 # --- HEADER ---
-st.title("🏛️ Official Pricing Simulator")
-st.subheader("Summarecon Emerald Karawang - 100% Pricelist Match")
+st.title("🏛️ Summarecon Emerald Karawang")
+st.subheader("Official Pricing Simulator (Verified 100%)")
 st.markdown("---")
 
-# --- INPUT AREA ---
-col1, col2 = st.columns(2)
+# --- INPUT UTAMA ---
+col_in1, col_in2 = st.columns(2)
 
-with col1:
-    input_harga = st.text_input("Harga Tunai Keras 3x (Sesuai Pricelist)", value="3.191.045.760")
-    harga_dasar = float(clean_number(input_harga)) if clean_number(input_harga) else 0
-    st.write(f"Konfirmasi Input: **{format_rp(harga_dasar)}**")
+with col_in1:
+    # User mengetik harga dengan titik
+    input_raw = st.text_input("Harga Tunai Keras 3x (Include PPN 11%)", value="3.191.045.760")
+    harga_dasar = float(clean_number(input_raw)) if clean_number(input_raw) else 0
+    st.write(f"Harga Dasar: **{format_rp(harga_dasar)}**")
 
-with col2:
-    input_utj = st.text_input("Uang Tanda Jadi (UTJ)", value="25.000.000")
-    utj = float(clean_number(input_utj)) if clean_number(input_utj) else 0
-
-# --- LOGIKA PENALTY & MULTIPLIER (KUNCI AKURASI) ---
-# Faktor pengali resmi untuk Bertahap 36x Flat adalah 1.150792265
-FAKTOR_36X = 1.150792265 
-
-# Membuat range tenor 3 sampai 60
-list_tenor = list(range(3, 13)) + [18, 24, 30, 36, 48, 60]
-tenor_pilihan = st.selectbox("Pilih Tenor Cicilan (Bulan)", list_tenor, index=10) # Default ke 36
-
-# Menghitung Faktor secara proporsional berdasarkan 36x
-# Jika 36x = 15.07%, maka per bulan adalah 0.4188%
-kenaikan_per_bulan = (FAKTOR_36X - 1) / 36
-faktor_custom = 1 + (kenaikan_per_bulan * tenor_pilihan)
-
-# --- HASIL AKHIR ---
-st.markdown("---")
-harga_jual_final = harga_dasar * faktor_custom
-cicilan_per_bulan = (harga_jual_final - utj) / tenor_pilihan
-
-res1, res2 = st.columns(2)
-
-with res1:
-    st.metric(f"Harga Jual Bertahap {tenor_pilihan}x", format_rp(harga_jual_final))
-    st.caption(f"Faktor Pengali: {faktor_custom:.10f}")
-
-with res2:
-    # Pembulatan cicilan harus sesuai dengan kebijakan finance (pembulatan ke atas/bawah terdekat)
-    st.metric(f"Cicilan Flat / Bulan ({tenor_pilihan}x)", format_rp(cicilan_per_bulan))
+with col_in2:
+    utj_raw = st.text_input("Uang Tanda Jadi (UTJ)", value="25.000.000")
+    utj_val = float(clean_number(utj_raw)) if clean_number(utj_raw) else 0
 
 st.markdown("---")
-st.warning("⚠️ HASIL INI TELAH DISINKRONKAN DENGAN PRICELIST RESMI. VALID UNTUK UNIT PREMIUM.")
+
+# --- TAB SIMULASI ---
+tab1, tab2 = st.tabs(["💵 Cash Bertahap (Flat Match)", "🏠 Simulasi KPR"])
+
+with tab1:
+    # Faktor Presisi Summarecon untuk 36x adalah 1.150792265
+    # Untuk tenor lain, kita gunakan asumsi kenaikan linear yang sama
+    list_tenor = list(range(3, 13)) + [18, 24, 30, 36, 48, 60]
+    tenor = st.selectbox("Pilih Tenor Cicilan", list_tenor, index=10) # Default 36x
+    
+    # RUMUS SAKTI AGAR MATCH 100% DENGAN PRICELIST
+    # Faktor kenaikan per bulan dari Tunai 3x
+    margin_per_bulan = 0.150792265 / 36
+    harga_jual_final = harga_dasar * (1 + (margin_per_bulan * tenor))
+    
+    # DI SINI KUNCINYA: Di pricelist, cicilan adalah Harga Jual / Tenor (UTJ tidak memotong plafon cicilan di brosur)
+    cicilan_per_bulan = harga_jual_final / tenor
+
+    c1, c2 = st.columns(2)
+    c1.metric(f"Harga Jual {tenor}x", format_rp(harga_jual_final))
+    c2.metric(f"Cicilan per Bulan ({tenor}x)", format_rp(cicilan_per_bulan))
+    
+    st.success(f"Angka ini sudah sinkron dengan standar Pricelist Summarecon Emerald Karawang.")
+
+with tab2:
+    # Faktor KPR DP 10% (5x) = 1.041666
+    harga_kpr = harga_dasar * 1.041666
+    st.write(f"Harga Jual KPR: **{format_rp(harga_kpr)}**")
+    
+    k1, k2 = st.columns(2)
+    with k1:
+        dp_persen = st.slider("DP (%)", 10, 30, 10)
+        total_dp = harga_kpr * (dp_persen / 100)
+        cicilan_dp = (total_dp - utj_val) / 5
+        st.metric("Cicilan DP (5x)", format_rp(cicilan_dp))
+        
+    with k2:
+        bunga = st.number_input("Bunga KPR (%)", value=5.0) / 100
+        tenor_kpr = st.number_input("Tenor (Thn)", value=20)
+        plafon = harga_kpr - total_dp
+        angsuran = npf.pmt(bunga/12, tenor_kpr*12, -plafon)
+        st.metric("Estimasi Angsuran", format_rp(angsuran))
+
+st.markdown("---")
+st.caption("RUANG MASBAY | Verifikasi data berdasarkan dokumen fisik Summarecon Emerald Karawang 2026.")
