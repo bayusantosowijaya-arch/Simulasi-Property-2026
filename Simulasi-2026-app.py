@@ -4,7 +4,7 @@ import re
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="SIMULASI BERTAHAP SUMMARECON", layout="wide")
 
-# --- CUSTOM CSS (GOLD & DARK THEME) ---
+# --- CUSTOM CSS (KUNCIAN MAS BAYU) ---
 st.markdown("""
     <style>
     .main { background-color: #0a192f; color: #ffffff; }
@@ -12,89 +12,72 @@ st.markdown("""
         background-color: #112240 !important; 
         color: #d4af37 !important; 
         border: 1px solid #d4af37 !important; 
-        font-size: 1.5rem !important;
+        font-size: 1.6rem !important;
         font-weight: bold !important;
         text-align: center;
     }
     .stMetric { 
         background-color: #112240; 
-        padding: 20px; 
+        padding: 25px; 
         border-radius: 15px; 
         border: 2px solid #d4af37; 
     }
-    div[data-testid="stMetricValue"] { color: #d4af37 !important; font-size: 2.2rem !important; }
-    label { font-size: 1.1rem !important; color: #ccd6f6 !important; }
+    div[data-testid="stMetricValue"] { color: #d4af37 !important; font-size: 2.5rem !important; }
+    label { font-size: 1.2rem !important; color: #ccd6f6 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNGSI HELPER ---
 def format_rp(angka):
     return f"Rp {int(angka):,.0f}".replace(",", ".")
 
 def clean_number(text):
     return re.sub(r'[^0-9]', '', text)
 
-# --- HEADER ---
 st.title("🏛️ Summarecon Emerald Karawang")
-st.subheader("Simulasi Bertahap - UTJ Memotong Harga")
+st.subheader("Simulasi Bertahap (UTJ Memangkas Harga)")
 st.markdown("---")
 
 # --- INPUT PANEL ---
-col_1, col_2, col_3 = st.columns([2, 2, 1.5])
+col_a, col_b, col_c = st.columns(3)
 
-with col_1:
+with col_a:
     input_raw = st.text_input("Harga Tunai Keras 3x", value="3.191.045.760")
     harga_dasar = float(clean_number(input_raw)) if clean_number(input_raw) else 0
 
-with col_2:
-    # UTJ Dinamis sesuai permintaan (1jt - 50jt)
-    utj_input = st.slider("Nominal UTJ (Memotong Harga)", 1000000, 50000000, 25000000, step=1000000)
-    st.write(f"UTJ Terpilih: **{format_rp(utj_input)}**")
+with col_b:
+    # INPUT UTJ DISINI
+    utj_raw = st.text_input("Input UTJ (1jt - 50jt)", value="25.000.000")
+    utj_val = float(clean_number(utj_raw)) if clean_number(utj_raw) else 0
 
-with col_3:
+with col_c:
     list_tenor = [12, 24, 36, 48, 60]
-    tenor = st.selectbox("Tenor (Bulan)", list_tenor, index=2)
+    tenor = st.selectbox("Pilih Tenor", list_tenor, index=2)
 
-st.markdown("---")
+st.markdown("### Hasil Simulasi")
 
-# --- LOGIKA PERHITUNGAN (Sesuai Pricelist Verena/Emerald) ---
-# Faktor pengali 36x Flat Match: 1.1507922650
-faktor_tetap_36x = 1.1507922650
+# --- LOGIKA KUNCIAN PRICELIST (JANGAN DIUBAH) ---
+# Faktor ini tetap untuk menjaga agar Harga Jual Final sesuai Brosur
+faktor_tetap_36x = 1.15079365
 margin_per_bulan = (faktor_tetap_36x - 1) / 36
-
-# 1. Hitung Harga Jual Final berdasarkan Tenor
 harga_jual_final = harga_dasar * (1 + (margin_per_bulan * tenor))
 
-# 2. Kurangi Harga dengan UTJ (UTJ Memangkas Harga)
-sisa_plafon_cicilan = harga_jual_final - utj_input
+# --- LOGIKA BARU: UTJ MEMANGKAS HARGA ---
+# Harga Jual Final dikurangi UTJ dulu, baru sisa-nya dibagi tenor
+sisa_plafon = harga_jual_final - utj_val
+cicilan_bulanan = sisa_plafon / tenor
 
-# 3. Hitung Cicilan per Bulan
-cicilan_bulanan = sisa_plafon_cicilan / tenor
-
-# --- DISPLAY HASIL ---
-st.markdown(f"### Hasil Simulasi Bertahap {tenor}x")
+# --- DISPLAY PANEL ---
 c1, c2, c3 = st.columns(3)
 
 with c1:
-    st.metric("Total Harga Jual", format_rp(harga_jual_final))
+    st.metric(f"Harga Jual ({tenor}x)", format_rp(harga_jual_final))
 
 with c2:
-    st.metric("Uang Tanda Jadi (UTJ)", format_rp(utj_input))
+    st.metric("UTJ (Booking)", format_rp(utj_val))
 
 with c3:
-    st.metric("Angsuran per Bulan", format_rp(cicilan_bulanan))
+    st.metric("Cicilan per Bulan", format_rp(cicilan_bulanan))
 
-# --- TABEL ESTIMASI CEPAT ---
 st.markdown("---")
-st.write("💡 **Tabel Referensi Cepat (Sisa Plafon Setelah UTJ):**")
-
-data_utj = [10000000, 25000000, 50000000]
-cols = st.columns(len(data_utj))
-
-for i, nominal in enumerate(data_utj):
-    sisa = harga_jual_final - nominal
-    cicil = sisa / tenor
-    with cols[i]:
-        st.info(f"**UTJ {format_rp(nominal)}**\n\nCicilan: {format_rp(cicil)}")
-
+st.info(f"💡 **Logika:** Harga Jual Final dikurangi UTJ {format_rp(utj_val)}, kemudian sisanya dibagi rata {tenor} bulan.")
 st.caption("RUANG MASBAY | Verified Marketing Tool 2026")
